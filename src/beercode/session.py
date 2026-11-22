@@ -5,9 +5,12 @@ from collections.abc import AsyncIterator
 
 from beercode import __version__
 from beercode.config import Provider
+from beercode.errors import RequestFailed, describe
 from beercode.messages import Message, ReplyComplete, TextDelta
 from beercode.protocols import ClientFactory, create_client
 from beercode.prompts import SYSTEM_PROMPT
+
+__all__ = ["RequestFailed", "Session", "new_session_id", "request_headers"]
 
 
 def new_session_id() -> str:
@@ -27,8 +30,11 @@ class Session:
 
     async def send(self, text: str) -> AsyncIterator[str]:
         user = Message("user", text)
-        async for event in self._client.stream(SYSTEM_PROMPT, [*self.history, user]):
-            if isinstance(event, TextDelta):
-                yield event.text
-            elif isinstance(event, ReplyComplete):
-                self.history.extend([user, event.message])
+        try:
+            async for event in self._client.stream(SYSTEM_PROMPT, [*self.history, user]):
+                if isinstance(event, TextDelta):
+                    yield event.text
+                elif isinstance(event, ReplyComplete):
+                    self.history.extend([user, event.message])
+        except Exception as error:
+            raise RequestFailed(describe(error)) from error

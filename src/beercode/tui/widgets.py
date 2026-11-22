@@ -42,6 +42,23 @@ class AssistantEntry(Static):
         pass
 
 
+class ErrorEntry(Static):
+    DEFAULT_CSS = """
+    ErrorEntry {
+        margin: 1 0 0 0;
+        padding: 0 1;
+        color: $error;
+        background: $error 15%;
+        border-left: thick $error;
+        text-style: bold;
+    }
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__(f"✗ 错误：{message}", markup=False)
+        self.message = message
+
+
 class Conversation(VerticalScroll):
     DEFAULT_CSS = """
     Conversation {
@@ -58,6 +75,12 @@ class Conversation(VerticalScroll):
 
     async def add_assistant(self) -> AssistantEntry:
         entry = AssistantEntry()
+        await self.mount(entry)
+        self.scroll_end(animate=False)
+        return entry
+
+    async def add_error(self, message: str) -> ErrorEntry:
+        entry = ErrorEntry(message)
         await self.mount(entry)
         self.scroll_end(animate=False)
         return entry

@@ -3,7 +3,7 @@ from __future__ import annotations
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 
-from beercode.session import Session
+from beercode.session import RequestFailed, Session
 from beercode.tui.widgets import Conversation, PromptInput, StatusBar
 
 EXIT_COMMAND = "/exit"
@@ -47,5 +47,9 @@ class BeerCodeApp(App):
                 entry.append(delta)
                 conversation.scroll_end(animate=False)
             entry.finish()
+        except RequestFailed as error:
+            if not entry.text:
+                await entry.remove()
+            await conversation.add_error(str(error))
         finally:
             self.busy = False

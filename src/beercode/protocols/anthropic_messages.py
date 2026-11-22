@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator, Mapping, Sequence
 from anthropic import AsyncAnthropic
 
 from beercode.config import Provider
+from beercode.errors import IncompleteReply
 from beercode.messages import Message, ReplyComplete, StreamEvent, TextDelta
 
 MAX_TOKENS = 8192
@@ -29,9 +30,13 @@ class AnthropicMessagesClient:
             messages=[_to_param(m) for m in history],
             max_tokens=MAX_TOKENS,
         ) as response:
+            stopped = False
             async for event in response:
                 if event.type == "content_block_delta" and event.delta.type == "text_delta":
                     yield TextDelta(event.delta.text)
+                stopped = stopped or event.type == "message_stop"
+            if not stopped:
+                raise IncompleteReply()
             final = await response.get_final_message()
         blocks = [block.model_dump(exclude_none=True) for block in final.content]
         text = "".join(b["text"] for b in blocks if b["type"] == "text")

@@ -31,14 +31,20 @@ Event = Text | Thinking | Pause
 class Reply:
     events: list[Event] = field(default_factory=list)
     chunk_delay: float = 0.0
+    status: int = 200
+    disconnect: bool = False
 
     @classmethod
-    def text(cls, text: str, *, thinking: str | None = None, chunk_size: int = 2, chunk_delay: float = 0.0) -> "Reply":
+    def text(cls, text: str, *, thinking: str | None = None, chunk_size: int = 2, chunk_delay: float = 0.0, disconnect: bool = False) -> "Reply":
         events: list[Event] = []
         if thinking:
             events.extend(Thinking(part) for part in _split(thinking, chunk_size))
         events.extend(Text(part) for part in _split(text, chunk_size))
-        return cls(events=events, chunk_delay=chunk_delay)
+        return cls(events=events, chunk_delay=chunk_delay, disconnect=disconnect)
+
+    @classmethod
+    def error(cls, status: int) -> "Reply":
+        return cls(status=status)
 
     @property
     def full_text(self) -> str:
@@ -98,6 +104,8 @@ def encode_openai(reply: Reply, model: str) -> Iterator[bytes | Pause]:
             yield chunk({"reasoning_content": event.text})
         else:
             yield chunk({"content": event.text})
+    if reply.disconnect:
+        return
     yield chunk({}, "stop")
     yield _sse("[DONE]")
 
@@ -123,6 +131,8 @@ def encode_anthropic(reply: Reply, model: str) -> Iterator[bytes | Pause]:
             yield event("content_block_start", {"index": index, "content_block": block})
         delta = {"type": "thinking_delta", "thinking": item.text} if kind == "thinking" else {"type": "text_delta", "text": item.text}
         yield event("content_block_delta", {"index": index, "delta": delta})
+    if reply.disconnect:
+        return
     if current is not None:
         yield from _close_anthropic_block(event, index, current)
     yield event("message_delta", {"delta": {"stop_reason": "end_turn", "stop_sequence": None}, "usage": {"output_tokens": 1}})
@@ -136,6 +146,29 @@ def _close_anthropic_block(event: Callable[[str, dict], bytes], index: int, kind
     if kind == "thinking":
         yield event("content_block_delta", {"index": index, "delta": {"type": "signature_delta", "signature": ANTHROPIC_SIGNATURE}})
     yield event("content_block_stop", {"index": index})
+
+
+ERROR_TYPES = {
+    400: "invalid_request_error",
+    401: "authentication_error",
+    403: "permission_error",
+    404: "not_found_error",
+    429: "rate_limit_error",
+    500: "api_error",
+}
+
+
+def error_body(protocol: str, status: int, message: str) -> bytes:
+    kind = ERROR_TYPES.get(status, "api_error")
+    if protocol == "anthropic":
+        body = {"type": "error", "error": {"type": kind, "message": message}}
+    else:
+        body = {"error": {"message": message, "type": kind, "param": None, "code": kind}}
+    return json.dumps(body, ensure_ascii=False).encode()
+
+
+def _presented_key(headers: dict[str, str]) -> str:
+    return headers.get("x-api-key") or headers.get("authorization", "").removeprefix("Bearer ")
 
 
 Encoder = Callable[[Reply, str], Iterator[bytes | Pause]]
@@ -220,6 +253,14 @@ class MockLLMServer:
                 with server._lock:
                     server.requests.append(RecordedRequest(protocol, self.path, headers, body))
                 reply = server._next_reply()
+                if reply.status != 200:
+                    payload = error_body(protocol, reply.status, f"Mock error {reply.status} for key {_presented_key(headers)}")
+                    self.send_response(reply.status)
+                    self.send_header("content-type", "application/json")
+                    self.send_header("content-length", str(len(payload)))
+                    self.end_headers()
+                    self.wfile.write(payload)
+                    return
                 self.send_response(200)
                 self.send_header("content-type", "text/event-stream")
                 self.send_header("cache-control", "no-cache")

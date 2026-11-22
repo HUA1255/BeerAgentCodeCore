@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator, Mapping, Sequence
 from openai import AsyncOpenAI
 
 from beercode.config import Provider
+from beercode.errors import IncompleteReply
 from beercode.messages import Message, ReplyComplete, StreamEvent, TextDelta
 
 MAX_TOKENS = 8192
@@ -32,11 +33,16 @@ class OpenAIChatClient:
             stream=True,
         )
         parts: list[str] = []
+        finished = False
         async for chunk in response:
             if not chunk.choices:
                 continue
-            content = chunk.choices[0].delta.content
+            choice = chunk.choices[0]
+            content = choice.delta.content
             if content:
                 parts.append(content)
                 yield TextDelta(content)
+            finished = finished or choice.finish_reason is not None
+        if not finished:
+            raise IncompleteReply()
         yield ReplyComplete(Message("assistant", "".join(parts)))
