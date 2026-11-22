@@ -52,6 +52,27 @@ class RecordedRequest:
     headers: dict[str, str]
     body: dict
 
+    @property
+    def system(self) -> str:
+        if self.protocol == "anthropic":
+            system = self.body.get("system", "")
+            return system if isinstance(system, str) else "".join(b.get("text", "") for b in system)
+        return next((m["content"] for m in self.body["messages"] if m["role"] == "system"), "")
+
+    @property
+    def conversation(self) -> list[dict]:
+        return [
+            {"role": m["role"], "content": _plain_text(m["content"])}
+            for m in self.body["messages"]
+            if m["role"] != "system"
+        ]
+
+
+def _plain_text(content: str | list) -> str:
+    if isinstance(content, str):
+        return content
+    return "".join(b.get("text", "") for b in content if b.get("type") == "text")
+
 
 def _split(text: str, size: int) -> list[str]:
     return [text[i : i + size] for i in range(0, len(text), size)] or [""]
@@ -81,10 +102,47 @@ def encode_openai(reply: Reply, model: str) -> Iterator[bytes | Pause]:
     yield _sse("[DONE]")
 
 
+def encode_anthropic(reply: Reply, model: str) -> Iterator[bytes | Pause]:
+    def event(name: str, data: dict) -> bytes:
+        return _sse({"type": name, **data}, event=name)
+
+    yield event("message_start", {"message": {"id": "msg_mock", "type": "message", "role": "assistant", "model": model, "content": [], "stop_reason": None, "stop_sequence": None, "usage": {"input_tokens": 1, "output_tokens": 0}}})
+    index = -1
+    current: str | None = None
+    for item in reply.events:
+        if isinstance(item, Pause):
+            yield item
+            continue
+        kind = "thinking" if isinstance(item, Thinking) else "text"
+        if kind != current:
+            if current is not None:
+                yield from _close_anthropic_block(event, index, current)
+            index += 1
+            current = kind
+            block = {"type": "thinking", "thinking": "", "signature": ""} if kind == "thinking" else {"type": "text", "text": ""}
+            yield event("content_block_start", {"index": index, "content_block": block})
+        delta = {"type": "thinking_delta", "thinking": item.text} if kind == "thinking" else {"type": "text_delta", "text": item.text}
+        yield event("content_block_delta", {"index": index, "delta": delta})
+    if current is not None:
+        yield from _close_anthropic_block(event, index, current)
+    yield event("message_delta", {"delta": {"stop_reason": "end_turn", "stop_sequence": None}, "usage": {"output_tokens": 1}})
+    yield event("message_stop", {})
+
+
+ANTHROPIC_SIGNATURE = "mock-signature"
+
+
+def _close_anthropic_block(event: Callable[[str, dict], bytes], index: int, kind: str) -> Iterator[bytes]:
+    if kind == "thinking":
+        yield event("content_block_delta", {"index": index, "delta": {"type": "signature_delta", "signature": ANTHROPIC_SIGNATURE}})
+    yield event("content_block_stop", {"index": index})
+
+
 Encoder = Callable[[Reply, str], Iterator[bytes | Pause]]
 
 ROUTES: dict[str, tuple[str, Encoder]] = {
     "/chat/completions": ("openai", encode_openai),
+    "/v1/messages": ("anthropic", encode_anthropic),
 }
 
 
