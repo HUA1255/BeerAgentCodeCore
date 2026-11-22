@@ -1,0 +1,33 @@
+[project]
+name = "beercode"
+version = "0.1.0"
+description = "BeerCode: a Claude Code style terminal AI coding assistant"
+authors = [
+    { name = "Feng", email = "34369163+HUA1255@users.noreply.github.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "openai>=3.57.0",
+    "pyyaml>=6.0.4",
+    "textual>=8.2.8",
+]
+
+[project.scripts]
+beercode = "beercode:main"
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.5.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+pythonpath = ["tests"]
+testpaths = ["tests"]
+markers = ["e2e: tmux 驱动的端到端测试"]
