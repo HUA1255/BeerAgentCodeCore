@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 
 from textual import events
@@ -42,6 +43,39 @@ class AssistantEntry(Static):
         pass
 
 
+class TurnTimer(Static):
+    DEFAULT_CSS = """
+    TurnTimer {
+        color: $text-muted;
+    }
+    """
+
+    FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+    def __init__(self) -> None:
+        super().__init__("", markup=False)
+        self.started = time.monotonic()
+        self.frame = 0
+
+    def on_mount(self) -> None:
+        self.refresh_label()
+        self.ticker = self.set_interval(0.1, self.tick)
+
+    def elapsed(self) -> int:
+        return int(time.monotonic() - self.started)
+
+    def tick(self) -> None:
+        self.frame = (self.frame + 1) % len(self.FRAMES)
+        self.refresh_label()
+
+    def refresh_label(self) -> None:
+        self.update(f"{self.FRAMES[self.frame]} Imagining… ({self.elapsed()}s)")
+
+    def stop(self) -> None:
+        self.ticker.stop()
+        self.update(f"✻ Imagined for {self.elapsed()}s")
+
+
 class Conversation(VerticalScroll):
     DEFAULT_CSS = """
     Conversation {
@@ -49,6 +83,9 @@ class Conversation(VerticalScroll):
         padding: 0 1;
     }
     """
+
+    def on_mount(self) -> None:
+        self.anchor()
 
     async def add_user(self, text: str) -> UserEntry:
         entry = UserEntry(text)
@@ -61,6 +98,12 @@ class Conversation(VerticalScroll):
         await self.mount(entry)
         self.scroll_end(animate=False)
         return entry
+
+    async def add_timer(self) -> TurnTimer:
+        timer = TurnTimer()
+        await self.mount(timer)
+        self.scroll_end(animate=False)
+        return timer
 
 
 class PromptInput(TextArea):
