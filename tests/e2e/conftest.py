@@ -1,6 +1,6 @@
 import pytest
 
-from support.beercode_terminal import BeerCodeTerminal, tmux_available, write_config
+from support.beercode_terminal import DEFAULT_PROVIDER, BeerCodeTerminal, tmux_available, write_config
 
 
 def pytest_collection_modifyitems(items):
@@ -12,10 +12,17 @@ def pytest_collection_modifyitems(items):
 
 
 @pytest.fixture
-def beercode(tmp_path, mock_llm):
+def protocol() -> str:
+    return "openai"
+
+
+@pytest.fixture
+def beercode(tmp_path, mock_llm, protocol):
     terminals: list[BeerCodeTerminal] = []
 
     def start(providers: list[dict] | None = None, *, width: int = 100, height: int = 30, ready: str | None = "mock-model") -> BeerCodeTerminal:
+        if providers is None:
+            providers = [{**DEFAULT_PROVIDER, "protocol": protocol}]
         write_config(tmp_path, mock_llm, providers)
         terminal = BeerCodeTerminal(tmp_path, width=width, height=height).start()
         terminals.append(terminal)
