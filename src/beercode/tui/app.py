@@ -4,7 +4,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 
 from beercode.session import Session
-from beercode.tui.widgets import Conversation, PromptInput, StatusBar
+from beercode.tui.widgets import Conversation, PromptBox, PromptInput, StatusBar
 
 EXIT_COMMAND = "/exit"
 
@@ -21,7 +21,7 @@ class BeerCodeApp(App):
 
     def compose(self) -> ComposeResult:
         yield Conversation(id="conversation")
-        yield PromptInput(id="prompt")
+        yield PromptBox()
         yield StatusBar(self.session.provider)
 
     def on_mount(self) -> None:
