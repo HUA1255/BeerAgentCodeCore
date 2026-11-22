@@ -1,8 +1,12 @@
-from support.mock_llm import Reply
+import pytest
+
+from support.mock_llm import ANTHROPIC_SIGNATURE, Reply
+
+pytestmark = pytest.mark.parametrize("protocol", ["openai", "anthropic"])
 
 
-def test_startup_shows_conversation_input_and_status_bar(beercode):
-    term = beercode([{"name": "Local Mock", "protocol": "openai", "model": "mock-model"}])
+def test_startup_shows_conversation_input_and_status_bar(beercode, protocol):
+    term = beercode([{"name": "Local Mock", "protocol": protocol, "model": "mock-model"}])
 
     screen = term.wait_for_text("Local Mock")
 
@@ -23,7 +27,7 @@ def test_reply_appears_incrementally_while_streaming(beercode, mock_llm):
     term.wait_for_text("ABCDEFGHIJKLMNOPQRST")
 
 
-def test_multi_turn_conversation_sends_full_history(beercode, mock_llm):
+def test_multi_turn_conversation_sends_full_history(beercode, mock_llm, protocol):
     mock_llm.enqueue("Nice to meet you, Ada.", "Your name is Ada.")
     term = beercode()
 
@@ -32,16 +36,17 @@ def test_multi_turn_conversation_sends_full_history(beercode, mock_llm):
     term.submit("What is my name?")
     term.wait_for_text("Your name is Ada.")
 
-    second = mock_llm.wait_for_requests(2)[1].body["messages"]
-    assert second[0]["role"] == "system"
-    assert second[1:] == [
+    second = mock_llm.wait_for_requests(2)[1]
+    assert second.protocol == protocol
+    assert second.system
+    assert second.conversation == [
         {"role": "user", "content": "My name is Ada"},
         {"role": "assistant", "content": "Nice to meet you, Ada."},
         {"role": "user", "content": "What is my name?"},
     ]
 
 
-def test_reasoning_content_is_hidden_and_not_sent_back(beercode, mock_llm):
+def test_thinking_is_hidden_and_replayed_only_as_protocol_requires(beercode, mock_llm, protocol):
     mock_llm.enqueue(Reply.text("Final answer 42", thinking="SECRET-REASONING-TRACE"), "Second answer")
     term = beercode()
 
@@ -52,7 +57,15 @@ def test_reasoning_content_is_hidden_and_not_sent_back(beercode, mock_llm):
     screen = term.wait_for_text("Second answer")
 
     assert "SECRET" not in screen
-    assert "SECRET" not in str(mock_llm.wait_for_requests(2)[1].body)
+    second = mock_llm.wait_for_requests(2)[1].body
+    if protocol == "anthropic":
+        assert second["messages"][1]["content"] == [
+            {"type": "thinking", "thinking": "SECRET-REASONING-TRACE", "signature": ANTHROPIC_SIGNATURE},
+            {"type": "text", "text": "Final answer 42"},
+        ]
+        assert "thinking" not in second
+    else:
+        assert "SECRET" not in str(second)
 
 
 def test_requests_share_one_session_id_and_identify_beercode(beercode, mock_llm):
@@ -85,7 +98,7 @@ def test_exit_requires_exact_command(beercode, mock_llm):
     term.submit("/exit now")
 
     term.wait_for_text("mock reply")
-    assert mock_llm.requests[0].body["messages"][-1]["content"] == "/exit now"
+    assert mock_llm.requests[0].conversation[-1]["content"] == "/exit now"
 
 
 def test_ctrl_c_quits_and_restores_terminal(beercode):
