@@ -1,0 +1,33 @@
+# BeerCode 配置示例
+# 使用方法：复制本文件为 beercode.yaml（已被 git 忽略），放在启动 beercode 的目录下，再按需修改。
+#
+# providers：供应商列表，至少一项。配置中的第一项即默认推荐的供应商。
+# 每个供应商包含以下字段：
+#   name      必填，可读名称，显示在状态栏与供应商选择列表中
+#   protocol  必填，接口协议，仅支持 anthropic 或 openai（openai 指 Chat Completions）
+#   model     必填，模型名
+#   base_url  可选，自定义端点地址；填写后覆盖该协议的默认端点，可用于接入各类兼容服务
+#   api_key   必填，可直接写明文密钥，或写成 ${ENV_VAR} 从环境变量读取（推荐，避免密钥落盘）
+
+providers:
+  # OpenCode Go（DeepSeek），OpenAI 兼容协议。
+  # 注意：需在 OpenCode 工作区 Settings › Privacy › Regions 中勾选 Global，才能使用 DeepSeek 模型。
+  # 查询可用模型列表：curl https://opencode.ai/inference/go/v1/models
+  - name: OpenCode Go (DeepSeek)
+    protocol: openai
+    base_url: https://opencode.ai/inference/go/openai/v1
+    model: deepseek-v4.1-flash
+    api_key: ${OPENCODE_API_KEY}
+
+  # 任意 OpenAI 兼容服务示例：把 base_url 换成服务商提供的地址（通常以 /v1 结尾）。
+  - name: OpenAI Compatible
+    protocol: openai
+    base_url: https://api.example.com/v1
+    model: your-model-name
+    api_key: ${OPENAI_COMPATIBLE_API_KEY}
+
+  # Claude 官方，Anthropic 协议；不填 base_url 即使用官方默认端点。
+  - name: Claude
+    protocol: anthropic
+    model: claude-sonnet-4-5
+    api_key: ${ANTHROPIC_API_KEY}

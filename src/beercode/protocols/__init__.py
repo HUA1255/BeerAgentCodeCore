@@ -20,8 +20,15 @@ def _openai_factory(provider: Provider, headers: Mapping[str, str]) -> ProtocolC
     return OpenAIChatClient(provider, headers)
 
 
+def _anthropic_factory(provider: Provider, headers: Mapping[str, str]) -> ProtocolClient:
+    from beercode.protocols.anthropic_messages import AnthropicMessagesClient
+
+    return AnthropicMessagesClient(provider, headers)
+
+
 FACTORIES: dict[str, ClientFactory] = {
     "openai": _openai_factory,
+    "anthropic": _anthropic_factory,
 }
 
 
