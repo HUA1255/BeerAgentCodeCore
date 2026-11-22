@@ -1,7 +1,8 @@
 import pytest
 
 from beercode.config import Provider
-from beercode.session import RequestFailed, Session
+from beercode.errors import RequestFailed
+from beercode.session import Session
 from support.mock_llm import Reply
 
 API_KEY = "sk-secret-123456"
@@ -46,7 +47,7 @@ async def test_disconnect_mid_stream_is_reported(mock_llm, protocol):
 
     error = await failure(session)
 
-    assert "连接中途断开" in str(error)
+    assert "连接中断，本轮回复不完整，未计入对话历史" in str(error)
 
 
 async def test_unreachable_server_is_reported(mock_llm, protocol):

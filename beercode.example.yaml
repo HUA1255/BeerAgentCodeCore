@@ -29,5 +29,5 @@ providers:
   # Claude 官方，Anthropic 协议；不填 base_url 即使用官方默认端点。
   - name: Claude
     protocol: anthropic
-    model: claude-sonnet-4-5
+    model: claude-sonnet-5-5
     api_key: ${ANTHROPIC_API_KEY}

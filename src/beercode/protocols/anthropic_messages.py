@@ -7,21 +7,13 @@ from anthropic import AsyncAnthropic
 from beercode.config import Provider
 from beercode.errors import IncompleteReply
 from beercode.messages import Message, ReplyComplete, StreamEvent, TextDelta
-
-MAX_TOKENS = 8192
-TIMEOUT_SECONDS = 120.0
+from beercode.protocols.common import MAX_TOKENS, client_options
 
 
 class AnthropicMessagesClient:
     def __init__(self, provider: Provider, headers: Mapping[str, str]) -> None:
         self._provider = provider
-        self._client = AsyncAnthropic(
-            api_key=provider.api_key,
-            base_url=provider.base_url,
-            default_headers=dict(headers),
-            timeout=TIMEOUT_SECONDS,
-            max_retries=0,
-        )
+        self._client = AsyncAnthropic(**client_options(provider, headers))
 
     async def stream(self, system: str, history: Sequence[Message]) -> AsyncIterator[StreamEvent]:
         async with self._client.messages.stream(

@@ -3,7 +3,8 @@ from __future__ import annotations
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 
-from beercode.session import RequestFailed, Session
+from beercode.errors import RequestFailed
+from beercode.session import Session
 from beercode.tui.widgets import Conversation, PromptBox, PromptInput, StatusBar
 
 EXIT_COMMAND = "/exit"
@@ -38,10 +39,12 @@ class BeerCodeApp(App):
 
     async def on_prompt_input_submitted(self, message: PromptInput.Submitted) -> None:
         text = message.text
+        if self.busy:
+            return
         if text == EXIT_COMMAND:
             self.exit()
             return
-        if self.busy or not text.strip():
+        if not text.strip():
             return
         self.query_one(PromptInput).clear()
         self.busy = True

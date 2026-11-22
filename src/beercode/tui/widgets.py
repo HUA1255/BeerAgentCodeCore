@@ -3,12 +3,14 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TypeVar
 
 from rich.markdown import Markdown
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
+from textual.widget import Widget
 from textual.widgets import Label, Static, TextArea
 
 from beercode import __version__
@@ -24,6 +26,8 @@ BEER_ART = "\n".join([
     "  |cccc|  ",
     "  `-==-'  ",
 ])
+
+W = TypeVar("W", bound=Widget)
 
 READY_TEXT = "Ready. Type a message and press Enter to send."
 
@@ -164,29 +168,22 @@ class Conversation(VerticalScroll):
     def on_mount(self) -> None:
         self.anchor()
 
-    async def add_user(self, text: str) -> UserEntry:
-        entry = UserEntry(text)
-        await self.mount(entry)
+    async def _append(self, widget: W) -> W:
+        await self.mount(widget)
         self.scroll_end(animate=False)
-        return entry
+        return widget
+
+    async def add_user(self, text: str) -> UserEntry:
+        return await self._append(UserEntry(text))
 
     async def add_assistant(self) -> AssistantEntry:
-        entry = AssistantEntry()
-        await self.mount(entry)
-        self.scroll_end(animate=False)
-        return entry
+        return await self._append(AssistantEntry())
 
     async def add_error(self, message: str) -> ErrorEntry:
-        entry = ErrorEntry(message)
-        await self.mount(entry)
-        self.scroll_end(animate=False)
-        return entry
+        return await self._append(ErrorEntry(message))
 
     async def add_timer(self) -> TurnTimer:
-        timer = TurnTimer()
-        await self.mount(timer)
-        self.scroll_end(animate=False)
-        return timer
+        return await self._append(TurnTimer())
 
 
 PLACEHOLDER = "Send a message..."

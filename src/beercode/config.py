@@ -11,7 +11,6 @@ import yaml
 CONFIG_FILENAME = "beercode.yaml"
 EXAMPLE_FILENAME = "beercode.example.yaml"
 REQUIRED_FIELDS = ("name", "protocol", "model", "api_key")
-PROTOCOLS = ("anthropic", "openai")
 ENV_REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 
@@ -56,8 +55,10 @@ def _parse_provider(index: int, item: object, env: Mapping[str, str]) -> Provide
         if item.get(field) in (None, ""):
             raise ConfigError(f"{CONFIG_FILENAME} 中{label}缺少必填字段 `{field}`。")
     protocol = str(item["protocol"])
-    if protocol not in PROTOCOLS:
-        allowed = "、".join(PROTOCOLS)
+    from beercode.protocols import FACTORIES
+
+    if protocol not in FACTORIES:
+        allowed = "、".join(sorted(FACTORIES))
         raise ConfigError(f"{CONFIG_FILENAME} 中{label}（{item['name']}）的 `protocol` 为 {protocol!r}，仅支持 {allowed}。")
     return Provider(
         name=str(item["name"]),

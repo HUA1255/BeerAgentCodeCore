@@ -53,6 +53,25 @@ def test_typing_allowed_but_enter_ignored_until_turn_ends(beercode, mock_llm):
     assert mock_llm.wait_for_requests(2)[1].body["messages"][-1]["content"] == "queued text"
 
 
+def test_exit_command_is_not_accepted_while_busy(beercode, mock_llm):
+    mock_llm.enqueue(Reply.text("busy answer finished", chunk_size=1, chunk_delay=0.1))
+    term = beercode()
+    term.submit("first")
+    term.wait_for_text("Imagining…")
+
+    term.submit("/exit")
+
+    screen = term.wait_for(r"Imagined for \d+s")
+    assert "busy answer finished" in screen
+    assert "/exit" in screen
+    assert len(mock_llm.requests) == 1
+
+    term.press("Enter")
+
+    assert term.wait_for_exit() == 0
+    assert term.tty_is_sane()
+
+
 def test_conversation_scrolls_while_waiting_and_streaming(beercode, mock_llm):
     long_reply = "\n\n".join(f"LINE-{i:02d}" for i in range(1, 31))
     mock_llm.enqueue(long_reply, Reply(events=[Pause(2), *Reply.text("Z" * 60, chunk_size=1).events], chunk_delay=0.1))

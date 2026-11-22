@@ -53,6 +53,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
+    { name = "httpx2" },
     { name = "openai" },
     { name = "pyyaml" },
     { name = "textual" },
@@ -67,6 +68,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=2.12.0" },
+    { name = "httpx2", specifier = ">=2.16.2" },
     { name = "openai", specifier = ">=3.57.0" },
     { name = "pyyaml", specifier = ">=6.0.4" },
     { name = "textual", specifier = ">=8.2.8" },

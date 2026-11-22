@@ -21,7 +21,7 @@ def error_lines(screen: str) -> list[str]:
         (Reply.error(401), "鉴权失败（401）"),
         (Reply.error(404), "模型或接口不存在（404）"),
         (Reply.error(429), "请求过于频繁或额度不足（429）"),
-        (Reply.text("半截回复内容", chunk_size=1, chunk_delay=0.05, disconnect=True), "连接中途断开"),
+        (Reply.text("半截回复内容", chunk_size=1, chunk_delay=0.05, disconnect=True), "连接中断，本轮回复不完整，未计入对话历史"),
     ],
     ids=["401", "404", "429", "disconnect"],
 )
@@ -48,7 +48,7 @@ def test_conversation_continues_without_the_failed_turn(beercode, mock_llm, prot
     term.submit("限流轮")
     term.wait_for_text("（429）")
     term.submit("断开轮")
-    term.wait_for_text("连接中途断开")
+    term.wait_for_text("连接中断")
     term.submit("我叫什么？")
     term.wait_for_text("你叫 Ada。")
 
@@ -58,3 +58,14 @@ def test_conversation_continues_without_the_failed_turn(beercode, mock_llm, prot
         {"role": "assistant", "content": "你好，Ada。"},
         {"role": "user", "content": "我叫什么？"},
     ]
+
+
+def test_disconnect_keeps_partial_reply_and_says_it_is_not_in_history(beercode, mock_llm, protocol):
+    mock_llm.enqueue(Reply.text("半截回复内容", chunk_size=1, chunk_delay=0.05, disconnect=True))
+    term = start(beercode, protocol)
+
+    term.submit("触发断开")
+    screen = term.wait_for_text("未计入对话历史")
+
+    assert "半截回复内容" in screen
+    assert "已丢弃" not in screen

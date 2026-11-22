@@ -10,9 +10,6 @@ from beercode.messages import Message, ReplyComplete, TextDelta
 from beercode.protocols import ClientFactory, create_client
 from beercode.prompts import SYSTEM_PROMPT
 
-__all__ = ["RequestFailed", "Session", "new_session_id", "request_headers"]
-
-
 def new_session_id() -> str:
     return f"ses_{secrets.token_hex(12)}"
 
